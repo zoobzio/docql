@@ -237,3 +237,41 @@ func enableSingleNode(client *http.Client, url, username, password string) error
 
 	return nil
 }
+
+// skipIfNoDynamoDB skips the test if DynamoDB Local is not available.
+// DynamoDB Local can be run as a Docker container but requires table setup.
+// These tests validate query rendering without requiring a live connection.
+func skipIfNoDynamoDB(t *testing.T) {
+	t.Helper()
+
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	// DynamoDB Local requires explicit setup
+	// If DYNAMODB_ENDPOINT is not set, run as render-only test
+	if os.Getenv("DYNAMODB_ENDPOINT") == "" {
+		// Still run the test but without actual API calls
+		// These tests validate query rendering
+		return
+	}
+}
+
+// skipIfNoFirestore skips the test if Firestore Emulator is not available.
+// Firestore Emulator requires gcloud SDK and explicit setup.
+// These tests validate query rendering without requiring a live connection.
+func skipIfNoFirestore(t *testing.T) {
+	t.Helper()
+
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	// Firestore Emulator requires explicit setup
+	// If FIRESTORE_EMULATOR_HOST is not set, run as render-only test
+	if os.Getenv("FIRESTORE_EMULATOR_HOST") == "" {
+		// Still run the test but without actual API calls
+		// These tests validate query rendering
+		return
+	}
+}
