@@ -1,0 +1,57 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    - gosec
+    - errorlint
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gocritic
+    - unconvert
+    - misspell
+    - nakedret
+    - prealloc
+    - predeclared
+    - copyloopvar
+
+  settings:
+    gosec:
+      excludes:
+        - G104
+
+    staticcheck:
+      checks:
+        - "all"
+        - "-QF1001"   # De Morgan's law suggestions
+        - "-ST1000"   # Package comments
+        - "-ST1020"   # Comment format
+        - "-ST1021"   # Comment format
+
+    govet:
+      disable:
+        - fieldalignment  # Struct alignment suggestions
+
+    gocritic:
+      enabled-checks:
+        - deferInLoop
+        - emptyFallthrough
+        - evalOrder
+        - nilValReturn
+        - rangeExprCopy
+        - rangeValCopy
+        - truncateCmp
+        - weakCond
+
+    misspell:
+      locale: US
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
