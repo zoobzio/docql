@@ -3,6 +3,7 @@
 [![CI](https://github.com/zoobzio/docql/actions/workflows/ci.yml/badge.svg)](https://github.com/zoobzio/docql/actions/workflows/ci.yml)
 [![Coverage](https://codecov.io/gh/zoobzio/docql/branch/main/graph/badge.svg)](https://codecov.io/gh/zoobzio/docql)
 [![Go Report Card](https://goreportcard.com/badge/github.com/zoobzio/docql)](https://goreportcard.com/report/github.com/zoobzio/docql)
+[![CodeQL](https://github.com/zoobzio/docql/actions/workflows/codeql.yml/badge.svg)](https://github.com/zoobzio/docql/actions/workflows/codeql.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/zoobzio/docql.svg)](https://pkg.go.dev/github.com/zoobzio/docql)
 [![License](https://img.shields.io/github/license/zoobzio/docql)](LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/zoobzio/docql)](go.mod)
