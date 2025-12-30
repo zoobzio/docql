@@ -4,6 +4,7 @@ package integration
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"testing"
@@ -61,6 +62,25 @@ func (c *couchClient) createDB(name string) error {
 	return nil
 }
 
+func (c *couchClient) createIndex(db string, fields []string) error {
+	index := map[string]interface{}{
+		"index": map[string]interface{}{
+			"fields": fields,
+		},
+	}
+	resp, err := c.request("POST", "/"+db+"/_index", index)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("create index failed with status %d: %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
 func (c *couchClient) deleteDB(name string) error {
 	resp, err := c.request("DELETE", "/"+name, nil)
 	if err != nil {
@@ -76,6 +96,11 @@ func (c *couchClient) insertDoc(db string, doc map[string]interface{}) error {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("insert failed with status %d: %s", resp.StatusCode, string(body))
+	}
 	return nil
 }
 
@@ -86,10 +111,20 @@ func (c *couchClient) find(db string, query map[string]interface{}) ([]map[strin
 	}
 	defer resp.Body.Close()
 
-	var result struct {
-		Docs []map[string]interface{} `json:"docs"`
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("find failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Docs    []map[string]interface{} `json:"docs"`
+		Warning string                   `json:"warning,omitempty"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, err
 	}
 	return result.Docs, nil
@@ -133,6 +168,17 @@ func setupCouchDB(t *testing.T, cc *CouchDBContainer) *couchClient {
 	_ = client.deleteDB("docql_test")
 	if err := client.createDB("docql_test"); err != nil {
 		t.Fatalf("Failed to create database: %v", err)
+	}
+
+	// Create indexes for Mango queries
+	if err := client.createIndex("docql_test", []string{"type"}); err != nil {
+		t.Fatalf("Failed to create type index: %v", err)
+	}
+	if err := client.createIndex("docql_test", []string{"type", "active"}); err != nil {
+		t.Fatalf("Failed to create type+active index: %v", err)
+	}
+	if err := client.createIndex("docql_test", []string{"type", "active", "age"}); err != nil {
+		t.Fatalf("Failed to create type+active+age index: %v", err)
 	}
 
 	// Seed users

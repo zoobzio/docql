@@ -2,8 +2,12 @@
 package integration
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"sync"
 	"testing"
@@ -153,9 +157,16 @@ func getCouchDBContainer(t *testing.T) *CouchDBContainer {
 			log.Fatalf("Failed to get couchdb port: %v", err)
 		}
 
+		url := "http://" + host + ":" + port.Port()
+
+		// Finish single-node cluster setup for CouchDB 3.x
+		if err := finishCouchDBSetup(url, "admin", "password"); err != nil {
+			log.Fatalf("Failed to finish CouchDB setup: %v", err)
+		}
+
 		sharedCouchDBContainer = &CouchDBContainer{
 			container: container,
-			url:       "http://" + host + ":" + port.Port(),
+			url:       url,
 			username:  "admin",
 			password:  "password",
 		}
@@ -163,4 +174,66 @@ func getCouchDBContainer(t *testing.T) *CouchDBContainer {
 	})
 
 	return sharedCouchDBContainer
+}
+
+// finishCouchDBSetup completes the single-node cluster setup for CouchDB 3.x.
+func finishCouchDBSetup(url, username, password string) error {
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	// Wait for authentication to be ready (retry a few times)
+	var lastErr error
+	for i := 0; i < 10; i++ {
+		req, err := http.NewRequest("GET", url+"/_session", nil)
+		if err != nil {
+			return err
+		}
+		req.SetBasicAuth(username, password)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = err
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if resp.StatusCode == 200 {
+			// Check if we're authenticated as admin
+			if bytes.Contains(body, []byte(`"roles":["_admin"]`)) {
+				// Enable single-node mode
+				return enableSingleNode(client, url, username, password)
+			}
+		}
+
+		lastErr = fmt.Errorf("auth check returned status %d: %s", resp.StatusCode, string(body))
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return fmt.Errorf("authentication not ready after retries: %w", lastErr)
+}
+
+func enableSingleNode(client *http.Client, url, username, password string) error {
+	payload := []byte(`{"action": "enable_single_node", "username": "` + username + `", "password": "` + password + `", "bind_address": "0.0.0.0", "port": 5984}`)
+	req, err := http.NewRequest("POST", url+"/_cluster_setup", bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	req.SetBasicAuth(username, password)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// 200, 201, or 400 (already configured) are all acceptable
+	if resp.StatusCode != 200 && resp.StatusCode != 201 && resp.StatusCode != 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("cluster setup failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
 }
